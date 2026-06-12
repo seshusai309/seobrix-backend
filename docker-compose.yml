@@ -1,0 +1,23 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: seobrix_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: seobrix
+      POSTGRES_PASSWORD: seobrix
+      POSTGRES_DB: seobrix
+    ports:
+      - '5432:5432'
+    volumes:
+      - seobrix_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U seobrix -d seobrix']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  seobrix_pgdata:
