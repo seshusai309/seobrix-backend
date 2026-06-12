@@ -2,7 +2,7 @@ import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { Strategy as FacebookStrategy } from 'passport-facebook';
 // @ts-ignore — passport-microsoft has no official @types package
-import MicrosoftStrategy from 'passport-microsoft';
+import { Strategy as MicrosoftStrategy } from 'passport-microsoft';
 import { Strategy as JwtStrategy, ExtractJwt } from 'passport-jwt';
 import prisma from './db';
 import { logger } from '../utils/logger';
