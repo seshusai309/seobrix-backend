@@ -22,20 +22,6 @@ export class ClientController {
     }
   }
 
-  async create(req: Request, res: Response): Promise<void> {
-    try {
-      if (!req.user!.agencyId) {
-        res.status(400).json({ success: false, error: { code: 'NO_AGENCY', message: 'Your account is not linked to an agency. Create an agency first.' } });
-        return;
-      }
-      const client = await clientService.create(req.user!.agencyId, req.body);
-      res.status(201).json({ success: true, data: client });
-    } catch (err: any) {
-      const status = err instanceof AppError ? err.statusCode : 500;
-      res.status(status).json({ success: false, error: { code: err.code || 'ERROR', message: err.message } });
-    }
-  }
-
   async getById(req: Request, res: Response): Promise<void> {
     try {
       const client = await clientService.findById(req.params.clientId);
@@ -66,24 +52,15 @@ export class ClientController {
     }
   }
 
-  async assignManager(req: Request, res: Response): Promise<void> {
+  // Move a client (and its projects) to another workspace. Staff assignments revoked.
+  async move(req: Request, res: Response): Promise<void> {
     try {
-      const assignment = await clientService.assignManager(
+      const client = await clientService.moveToWorkspace(
         req.params.clientId,
-        req.body.userId,
+        req.body.workspaceId,
         req.user!.agencyId!
       );
-      res.status(200).json({ success: true, data: assignment });
-    } catch (err: any) {
-      const status = err instanceof AppError ? err.statusCode : 500;
-      res.status(status).json({ success: false, error: { code: err.code || 'ERROR', message: err.message } });
-    }
-  }
-
-  async unassignManager(req: Request, res: Response): Promise<void> {
-    try {
-      await clientService.unassignManager(req.params.clientId, req.params.userId);
-      res.status(200).json({ success: true, message: 'Manager unassigned' });
+      res.status(200).json({ success: true, data: client });
     } catch (err: any) {
       const status = err instanceof AppError ? err.statusCode : 500;
       res.status(status).json({ success: false, error: { code: err.code || 'ERROR', message: err.message } });

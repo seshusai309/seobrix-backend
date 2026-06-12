@@ -17,12 +17,22 @@ export class ClientRepository {
     });
   }
 
-  async findAssignedToManager(userId: string): Promise<Client[]> {
-    const assignments = await prisma.clientAssignment.findMany({
-      where: { userId },
-      include: { client: true },
+  async findByWorkspace(workspaceId: string): Promise<Client[]> {
+    return prisma.client.findMany({
+      where: { workspaceId, isActive: true },
+      orderBy: { createdAt: 'desc' },
     });
-    return assignments.map((a) => a.client).filter((c) => c.isActive);
+  }
+
+  // Clients in workspaces a staff member belongs to (for SEO_MANAGER / SEO_EXPERT).
+  async findForMember(userId: string): Promise<Client[]> {
+    return prisma.client.findMany({
+      where: {
+        isActive: true,
+        workspace: { members: { some: { userId } } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
   async update(id: string, data: Prisma.ClientUpdateInput): Promise<Client> {
@@ -33,24 +43,17 @@ export class ClientRepository {
     return prisma.client.update({ where: { id }, data: { isActive: false } });
   }
 
-  async assignManager(clientId: string, userId: string) {
-    return prisma.clientAssignment.upsert({
-      where: { clientId_userId: { clientId, userId } },
-      update: {},
-      create: { clientId, userId },
-    });
-  }
-
-  async unassignManager(clientId: string, userId: string) {
-    return prisma.clientAssignment.delete({
-      where: { clientId_userId: { clientId, userId } },
-    });
-  }
-
-  async getAssignments(clientId: string) {
-    return prisma.clientAssignment.findMany({
-      where: { clientId },
-      include: { user: true },
+  // Moves a client to another workspace. Projects follow the client automatically
+  // (they derive workspace via the client); every staff project-assignment under
+  // this client is wiped, since staff do not move with the client.
+  async moveToWorkspace(clientId: string, workspaceId: string): Promise<Client> {
+    return prisma.$transaction(async (tx) => {
+      const projects = await tx.project.findMany({ where: { clientId }, select: { id: true } });
+      const projectIds = projects.map((p) => p.id);
+      if (projectIds.length) {
+        await tx.projectAssignment.deleteMany({ where: { projectId: { in: projectIds } } });
+      }
+      return tx.client.update({ where: { id: clientId }, data: { workspaceId } });
     });
   }
 }

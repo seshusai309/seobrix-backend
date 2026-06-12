@@ -33,7 +33,8 @@ export class UserService {
       name: input.name,
       role: input.role,
       agencyId,
-      clientIds: input.clientIds,
+      clientId: input.clientId,
+      workspaceIds: input.workspaceIds,
       expiresAt,
     });
 
@@ -81,7 +82,7 @@ export class UserService {
     const rawToken = randomBytes(32).toString('hex');
     const tokenHash = hashToken(rawToken);
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    const clientIds = invite.clientIds ? JSON.parse(invite.clientIds) : [];
+    const workspaceIds = invite.workspaceIds ? JSON.parse(invite.workspaceIds) : [];
 
     await inviteRepo.create({
       tokenHash,
@@ -89,7 +90,8 @@ export class UserService {
       name: invite.name,
       role: invite.role,
       agencyId,
-      clientIds,
+      clientId: invite.clientId,
+      workspaceIds,
       expiresAt,
     });
 

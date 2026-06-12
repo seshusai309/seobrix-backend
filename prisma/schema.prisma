@@ -46,6 +46,13 @@ enum BlogStatus {
 
 // ─────────────────────────────────────────────
 // Models
+//
+// Hierarchy: Agency → Workspace → Client → Project
+//   - Staff (SEO_MANAGER/SEO_EXPERT) join workspaces (WorkspaceMember)
+//     and are assigned to specific projects (ProjectAssignment).
+//   - A Project belongs to a Client and derives its workspace through
+//     the Client — it stores no workspaceId of its own, so moving a
+//     client between workspaces moves all its projects for free.
 // ─────────────────────────────────────────────
 
 model User {
@@ -56,12 +63,12 @@ model User {
   name         String
   role         Role
   agencyId     String?
-  clientId     String?
+  clientId     String? // set for CLIENT-role users — links to their Client record
   isActive     Boolean  @default(true)
 
   // OAuth fields (null for email/password users)
-  provider     String?  // "google" | "facebook" | "microsoft"
-  providerId   String?  // ID from the OAuth provider
+  provider     String? // "google" | "facebook" | "microsoft"
+  providerId   String? // ID from the OAuth provider
 
   // Refresh token stored hashed so we can revoke it
   refreshTokenHash String?
@@ -73,12 +80,13 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  agency      Agency?            @relation(fields: [agencyId], references: [id])
-  client      Client?            @relation(fields: [clientId], references: [id])
-  assignments ClientAssignment[]
-  blogsAuthored Blog[]           @relation("author")
-  blogsReviewed Blog[]           @relation("reviewer")
-  blogHistory  BlogHistory[]
+  agency             Agency?             @relation(fields: [agencyId], references: [id])
+  client             Client?             @relation(fields: [clientId], references: [id])
+  workspaceMembers   WorkspaceMember[]
+  projectAssignments ProjectAssignment[]
+  blogsAuthored      Blog[]              @relation("author")
+  blogsReviewed      Blog[]              @relation("reviewer")
+  blogHistory        BlogHistory[]
 
   @@unique([provider, providerId])
   @@index([agencyId])
@@ -93,21 +101,53 @@ model Agency {
   updatedAt DateTime     @updatedAt
 
   users        User[]
+  workspaces   Workspace[]
   clients      Client[]
   inviteTokens InviteToken[]
 }
 
-model InviteToken {
+model Workspace {
   id        String   @id @default(uuid())
-  tokenHash String   @unique
-  email     String
-  name      String
-  role      Role
   agencyId  String
-  clientIds String?
-  expiresAt DateTime
-  used      Boolean  @default(false)
+  name      String
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agency  Agency            @relation(fields: [agencyId], references: [id])
+  clients Client[]
+  members WorkspaceMember[]
+
+  @@index([agencyId])
+}
+
+// Staff ↔ Workspace membership (many-to-many).
+// A staff member can belong to multiple workspaces.
+model WorkspaceMember {
+  id          String   @id @default(uuid())
+  workspaceId String
+  userId      String
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+}
+
+model InviteToken {
+  id           String   @id @default(uuid())
+  tokenHash    String   @unique
+  email        String
+  name         String
+  role         Role
+  agencyId     String
+  workspaceIds String? // JSON array — staff invites: which workspaces to join
+  clientId     String? // CLIENT invites: which client record they belong to
+  expiresAt    DateTime
+  used         Boolean  @default(false)
+  createdAt    DateTime @default(now())
 
   agency Agency @relation(fields: [agencyId], references: [id])
 
@@ -115,58 +155,79 @@ model InviteToken {
 }
 
 model Client {
-  id         String   @id @default(uuid())
-  agencyId   String
-  name       String
-  websiteUrl String
-  industry   String?
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id          String   @id @default(uuid())
+  agencyId    String
+  workspaceId String
+  name        String
+  industry    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  agency       Agency             @relation(fields: [agencyId], references: [id])
-  integrations Integration[]
-  blogs        Blog[]
-  users        User[]
-  assignments  ClientAssignment[]
+  agency    Agency    @relation(fields: [agencyId], references: [id])
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  users     User[]
+  projects  Project[]
 
   @@index([agencyId])
+  @@index([workspaceId])
 }
 
-model ClientAssignment {
-  id       String @id @default(uuid())
-  clientId String
-  userId   String
+// A Project = one website property. Created by the CLIENT user.
+// Belongs to a Client; derives its workspace through the Client.
+model Project {
+  id          String   @id @default(uuid())
+  clientId    String
+  name        String
+  websiteUrl  String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  createdAt DateTime @default(now())
-
-  client Client @relation(fields: [clientId], references: [id])
-  user   User   @relation(fields: [userId], references: [id])
-
-  @@unique([clientId, userId])
-  @@index([userId])
-}
-
-model Integration {
-  id              String            @id @default(uuid())
-  clientId        String
-  type            CmsType
-  siteUrl         String
-  username        String?
-  tokenEncrypted  String
-  status          IntegrationStatus @default(CONNECTED)
-  lastTestedAt    DateTime?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-
-  client Client @relation(fields: [clientId], references: [id])
+  client       Client              @relation(fields: [clientId], references: [id])
+  integrations Integration[]
+  blogs        Blog[]
+  assignments  ProjectAssignment[]
 
   @@index([clientId])
 }
 
+// Staff ↔ Project assignment (many-to-many).
+// Wiped when the project's client moves to another workspace.
+model ProjectAssignment {
+  id        String   @id @default(uuid())
+  projectId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@unique([projectId, userId])
+  @@index([userId])
+}
+
+model Integration {
+  id             String            @id @default(uuid())
+  projectId      String
+  type           CmsType
+  siteUrl        String
+  username       String?
+  tokenEncrypted String
+  status         IntegrationStatus @default(CONNECTED)
+  lastTestedAt   DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@index([projectId])
+}
+
 model Blog {
   id               String     @id @default(uuid())
-  clientId         String
+  projectId        String
   authorId         String
   reviewerId       String?
   title            String
@@ -184,12 +245,12 @@ model Blog {
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
 
-  client   Client      @relation(fields: [clientId], references: [id])
-  author   User        @relation("author", fields: [authorId], references: [id])
-  reviewer User?       @relation("reviewer", fields: [reviewerId], references: [id])
+  project  Project       @relation(fields: [projectId], references: [id])
+  author   User          @relation("author", fields: [authorId], references: [id])
+  reviewer User?         @relation("reviewer", fields: [reviewerId], references: [id])
   history  BlogHistory[]
 
-  @@index([clientId])
+  @@index([projectId])
   @@index([authorId])
   @@index([status])
 }

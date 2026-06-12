@@ -21,8 +21,21 @@ router.get(
 
 /**
  * @access private (CLIENT only)
+ * @route GET /projects
+ * @desc Get the client's own projects
+ */
+router.get(
+  '/projects',
+  rateLimiter({ max: 30 }),
+  authenticateToken,
+  requireClient,
+  portalController.listProjects.bind(portalController)
+);
+
+/**
+ * @access private (CLIENT only)
  * @route GET /blogs
- * @desc Get all published blogs for the client's website
+ * @desc Get all published blogs across the client's projects
  */
 router.get(
   '/blogs',

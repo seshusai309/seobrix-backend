@@ -7,7 +7,7 @@ const integrationService = new IntegrationService();
 export class IntegrationController {
   async list(req: Request, res: Response): Promise<void> {
     try {
-      const integrations = await integrationService.listByClient(req.params.clientId);
+      const integrations = await integrationService.listByProject(req.params.projectId);
       res.status(200).json({ success: true, data: integrations });
     } catch (err: any) {
       res.status(500).json({ success: false, error: { code: 'ERROR', message: err.message } });
@@ -16,7 +16,7 @@ export class IntegrationController {
 
   async connectWordPress(req: Request, res: Response): Promise<void> {
     try {
-      const integration = await integrationService.connectWordPress(req.params.clientId, req.body);
+      const integration = await integrationService.connectWordPress(req.params.projectId, req.body);
       res.status(201).json({ success: true, data: integration });
     } catch (err: any) {
       const status = err instanceof AppError ? err.statusCode : 500;
@@ -26,7 +26,7 @@ export class IntegrationController {
 
   async connectShopify(req: Request, res: Response): Promise<void> {
     try {
-      const integration = await integrationService.connectShopify(req.params.clientId, req.body);
+      const integration = await integrationService.connectShopify(req.params.projectId, req.body);
       res.status(201).json({ success: true, data: integration });
     } catch (err: any) {
       const status = err instanceof AppError ? err.statusCode : 500;

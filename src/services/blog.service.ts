@@ -10,7 +10,7 @@ import { logger } from '../utils/logger';
 import { emailService } from '../utils/emailService';
 import { AppError } from '../utils/errors/app.error';
 import { BlogNotFoundError, BlogNotEditableError, BlogInvalidTransitionError, BlogPublishError } from '../utils/errors/blog.errors';
-import { IntegrationBrokenError, IntegrationNotFoundError } from '../utils/errors/integration.errors';
+import { IntegrationNotFoundError } from '../utils/errors/integration.errors';
 import { CreateBlogInput, UpdateBlogInput, ReviewActionInput, PublishBlogInput } from '../validators/blog.validator';
 
 const blogRepo = new BlogRepository();
@@ -19,7 +19,7 @@ const integrationRepo = new IntegrationRepository();
 const userRepo = new UserRepository();
 
 export class BlogService {
-  async create(clientId: string, authorId: string, input: CreateBlogInput) {
+  async create(projectId: string, authorId: string, input: CreateBlogInput) {
     const blog = await blogRepo.create({
       title: input.title,
       slug: input.slug,
@@ -28,7 +28,7 @@ export class BlogService {
       metaDescription: input.metaDescription,
       featuredImageUrl: input.featuredImageUrl,
       status: BlogStatus.DRAFT,
-      client: { connect: { id: clientId } },
+      project: { connect: { id: projectId } },
       author: { connect: { id: authorId } },
     });
 
@@ -37,17 +37,11 @@ export class BlogService {
     return blog;
   }
 
-  async list(clientId: string, userId: string, role: Role, agencyId: string, status?: BlogStatus) {
-    if (role === Role.SEO_EXPERT || role === Role.AGENCY_ADMIN) {
-      return blogRepo.findByClient(clientId, status);
-    }
-    if (role === Role.SEO_MANAGER) {
-      return blogRepo.findByClient(clientId, status);
-    }
+  async list(projectId: string, _userId: string, role: Role, _agencyId: string, status?: BlogStatus) {
     if (role === Role.CLIENT) {
-      return blogRepo.findPublishedByClient(clientId);
+      return blogRepo.findPublishedByProject(projectId);
     }
-    return blogRepo.findByClient(clientId, status);
+    return blogRepo.findByProject(projectId, status);
   }
 
   async findById(id: string) {
@@ -92,14 +86,15 @@ export class BlogService {
     // Notify all reviewers (AGENCY_ADMIN + SEO_EXPERT) in the agency
     const blogWithRelations = await blogRepo.findByIdWithRelations(id);
     if (blogWithRelations) {
-      const { author, client } = blogWithRelations;
+      const { author, project } = blogWithRelations;
+      const client = project.client;
       const reviewers = await userRepo.findMany({
         agencyId: client.agencyId,
         role: { in: [Role.AGENCY_ADMIN, Role.SEO_EXPERT] },
         isActive: true,
       });
       for (const r of reviewers) {
-        emailService.sendBlogSubmittedNotification(r.email, r.name, blog.title, client.name, author.name).catch(() => {});
+        emailService.sendBlogSubmittedNotification(r.email ?? '', r.name, blog.title, client.name, author.name).catch(() => {});
       }
     }
 
@@ -121,8 +116,8 @@ export class BlogService {
     // Notify author
     const blogWithRelations = await blogRepo.findByIdWithRelations(id);
     if (blogWithRelations) {
-      const { author, client } = blogWithRelations;
-      emailService.sendBlogApproved(author.email, author.name, blog.title, client.name).catch(() => {});
+      const { author, project } = blogWithRelations;
+      emailService.sendBlogApproved((author.email ?? ''), author.name, blog.title, project.client.name).catch(() => {});
     }
 
     return updated;
@@ -146,8 +141,8 @@ export class BlogService {
       userRepo.findById(actorId),
     ]);
     if (blogWithRelations && reviewer) {
-      const { author, client } = blogWithRelations;
-      emailService.sendBlogChangesRequested(author.email, author.name, blog.title, client.name, reviewer.name, input.note ?? undefined).catch(() => {});
+      const { author, project } = blogWithRelations;
+      emailService.sendBlogChangesRequested((author.email ?? ''), author.name, blog.title, project.client.name, reviewer.name, input.note ?? undefined).catch(() => {});
     }
 
     return updated;
@@ -171,8 +166,8 @@ export class BlogService {
       userRepo.findById(actorId),
     ]);
     if (blogWithRelations && reviewer) {
-      const { author, client } = blogWithRelations;
-      emailService.sendBlogRejected(author.email, author.name, blog.title, client.name, reviewer.name, input.note ?? undefined).catch(() => {});
+      const { author, project } = blogWithRelations;
+      emailService.sendBlogRejected((author.email ?? ''), author.name, blog.title, project.client.name, reviewer.name, input.note ?? undefined).catch(() => {});
     }
 
     return updated;
@@ -183,8 +178,8 @@ export class BlogService {
     if (blog.authorId !== actorId) throw new AppError('Only the author can publish this blog', 'FORBIDDEN', 403);
     if (blog.status !== BlogStatus.APPROVED) throw new BlogInvalidTransitionError(blog.status, BlogStatus.PUBLISHED);
 
-    // Find an active integration of the requested CMS type for this client
-    const integrations = await integrationRepo.findByClient(blog.clientId);
+    // Find an active integration of the requested CMS type for this project
+    const integrations = await integrationRepo.findByProject(blog.projectId);
     const integration = integrations.find(
       (i) => i.type === input.cmsType && i.status !== 'DISCONNECTED'
     );
@@ -260,11 +255,11 @@ export class BlogService {
     await historyRepo.record(id, actorId, 'published');
     logger.success(actorId, 'publishBlog', `Blog ${id} published to ${input.cmsType}: ${livePostUrl}`);
 
-    // Notify author (and anyone in the agency who should know)
+    // Notify author
     const blogWithRelations = await blogRepo.findByIdWithRelations(id);
     if (blogWithRelations) {
-      const { author, client } = blogWithRelations;
-      emailService.sendBlogPublished([author.email], blog.title, client.name, livePostUrl).catch(() => {});
+      const { author, project } = blogWithRelations;
+      emailService.sendBlogPublished([(author.email ?? '')], blog.title, project.client.name, livePostUrl).catch(() => {});
     }
 
     return updated;
@@ -281,5 +276,9 @@ export class BlogService {
 
   async findPublishedByClient(clientId: string) {
     return blogRepo.findPublishedByClient(clientId);
+  }
+
+  async findPublishedByProject(projectId: string) {
+    return blogRepo.findPublishedByProject(projectId);
   }
 }

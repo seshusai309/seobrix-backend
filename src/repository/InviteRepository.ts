@@ -13,7 +13,8 @@ export class InviteRepository {
     name: string;
     role: Role;
     agencyId: string;
-    clientIds?: string[];
+    clientId?: string | null;
+    workspaceIds?: string[];
     expiresAt: Date;
   }) {
     return prisma.inviteToken.create({
@@ -23,7 +24,8 @@ export class InviteRepository {
         name: data.name,
         role: data.role,
         agencyId: data.agencyId,
-        clientIds: data.clientIds ? JSON.stringify(data.clientIds) : null,
+        clientId: data.clientId ?? null,
+        workspaceIds: data.workspaceIds ? JSON.stringify(data.workspaceIds) : null,
         expiresAt: data.expiresAt,
       },
     });

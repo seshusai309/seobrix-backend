@@ -13,28 +13,35 @@ export class BlogRepository {
   async findByIdWithRelations(id: string) {
     return prisma.blog.findUnique({
       where: { id },
-      include: { author: true, client: true },
+      include: { author: true, project: { include: { client: true } } },
     });
   }
 
-  async findByClient(clientId: string, status?: BlogStatus): Promise<Blog[]> {
+  async findByProject(projectId: string, status?: BlogStatus): Promise<Blog[]> {
     return prisma.blog.findMany({
-      where: { clientId, ...(status ? { status } : {}) },
+      where: { projectId, ...(status ? { status } : {}) },
       orderBy: { updatedAt: 'desc' },
     });
   }
 
   async findByAgencyInReview(agencyId: string): Promise<Blog[]> {
     return prisma.blog.findMany({
-      where: { status: BlogStatus.IN_REVIEW, client: { is: { agencyId } } },
-      include: { author: true, client: true },
+      where: { status: BlogStatus.IN_REVIEW, project: { is: { client: { is: { agencyId } } } } },
+      include: { author: true, project: { include: { client: true } } },
       orderBy: { updatedAt: 'asc' },
+    });
+  }
+
+  async findPublishedByProject(projectId: string): Promise<Blog[]> {
+    return prisma.blog.findMany({
+      where: { projectId, status: BlogStatus.PUBLISHED },
+      orderBy: { publishedAt: 'desc' },
     });
   }
 
   async findPublishedByClient(clientId: string): Promise<Blog[]> {
     return prisma.blog.findMany({
-      where: { clientId, status: BlogStatus.PUBLISHED },
+      where: { status: BlogStatus.PUBLISHED, project: { is: { clientId } } },
       orderBy: { publishedAt: 'desc' },
     });
   }

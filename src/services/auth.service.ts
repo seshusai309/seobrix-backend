@@ -114,7 +114,7 @@ export class AuthService {
     const otp = Math.floor(1000 + Math.random() * 9000).toString();
     const otpExpires = new Date(Date.now() + 5 * 60 * 1000);
     await userRepo.updateOtp(existing.id, otp, otpExpires);
-    const sent = await emailService.sendOTP(existing.email, otp);
+    const sent = await emailService.sendOTP(email, otp);
     if (!sent) throw new AppError('Failed to send OTP. Please try again.', 'EMAIL_SEND_FAILED', 503);
 
     return { status: 'otp_resent' };
@@ -270,7 +270,7 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
-    const clientIds: string[] = invite.clientIds ? JSON.parse(invite.clientIds) : [];
+    const workspaceIds: string[] = invite.workspaceIds ? JSON.parse(invite.workspaceIds) : [];
 
     const newUser = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
@@ -281,15 +281,17 @@ export class AuthService {
           role: invite.role,
           agencyId: invite.agencyId,
           isActive: true,
-          ...(invite.role === 'CLIENT' && clientIds[0]
-            ? { clientId: clientIds[0] }
+          // CLIENT users are linked to the client record from the invite
+          ...(invite.role === 'CLIENT' && invite.clientId
+            ? { clientId: invite.clientId }
             : {}),
         },
       });
 
-      if (invite.role === 'SEO_MANAGER' && clientIds.length) {
-        await tx.clientAssignment.createMany({
-          data: clientIds.map((clientId) => ({ clientId, userId: user.id })),
+      // Staff join the workspaces named in the invite
+      if ((invite.role === 'SEO_MANAGER' || invite.role === 'SEO_EXPERT') && workspaceIds.length) {
+        await tx.workspaceMember.createMany({
+          data: workspaceIds.map((workspaceId) => ({ workspaceId, userId: user.id })),
           skipDuplicates: true,
         });
       }

@@ -22,7 +22,7 @@ export class AgencyRepository {
     const [users, clients, blogs] = await Promise.all([
       prisma.user.count({ where: { agencyId: id } }),
       prisma.client.count({ where: { agencyId: id } }),
-      prisma.blog.count({ where: { client: { agencyId: id } } }),
+      prisma.blog.count({ where: { project: { client: { agencyId: id } } } }),
     ]);
     return { users, clients, blogs };
   }

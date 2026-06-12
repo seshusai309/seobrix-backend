@@ -10,7 +10,7 @@ export class BlogController {
     try {
       const status = req.query.status as BlogStatus | undefined;
       const blogs = await blogService.list(
-        req.params.clientId,
+        req.params.projectId,
         req.user!.id,
         req.user!.role,
         req.user!.agencyId ?? '',
@@ -24,7 +24,7 @@ export class BlogController {
 
   async create(req: Request, res: Response): Promise<void> {
     try {
-      const blog = await blogService.create(req.params.clientId, req.user!.id, req.body);
+      const blog = await blogService.create(req.params.projectId, req.user!.id, req.body);
       res.status(201).json({ success: true, data: blog });
     } catch (err: any) {
       const status = err instanceof AppError ? err.statusCode : 500;

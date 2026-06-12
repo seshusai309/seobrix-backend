@@ -10,9 +10,9 @@ export class IntegrationRepository {
     return prisma.integration.findUnique({ where: { id } });
   }
 
-  async findByClient(clientId: string): Promise<Integration[]> {
+  async findByProject(projectId: string): Promise<Integration[]> {
     return prisma.integration.findMany({
-      where: { clientId },
+      where: { projectId },
       orderBy: { createdAt: 'desc' },
     });
   }

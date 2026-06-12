@@ -11,7 +11,7 @@ import { ConnectWordPressInput, ConnectShopifyInput } from '../validators/integr
 const integrationRepo = new IntegrationRepository();
 
 export class IntegrationService {
-  async connectWordPress(clientId: string, input: ConnectWordPressInput) {
+  async connectWordPress(projectId: string, input: ConnectWordPressInput) {
     const ok = await WordPressClient.testConnection(input.siteUrl, input.username, input.applicationPassword);
     if (!ok) throw new IntegrationConnectionError('Could not connect to WordPress. Check your site URL and application password.');
 
@@ -23,14 +23,14 @@ export class IntegrationService {
       tokenEncrypted,
       status: IntegrationStatus.CONNECTED,
       lastTestedAt: new Date(),
-      client: { connect: { id: clientId } },
+      project: { connect: { id: projectId } },
     });
 
-    logger.success('system', 'connectWordPress', `WordPress connected for client ${clientId}`);
+    logger.success('system', 'connectWordPress', `WordPress connected for project ${projectId}`);
     return this.safeIntegration(integration);
   }
 
-  async connectShopify(clientId: string, input: ConnectShopifyInput) {
+  async connectShopify(projectId: string, input: ConnectShopifyInput) {
     const ok = await ShopifyClient.testConnection(input.siteUrl, input.accessToken);
     if (!ok) throw new IntegrationConnectionError('Could not connect to Shopify. Check your store URL and access token.');
 
@@ -41,10 +41,10 @@ export class IntegrationService {
       tokenEncrypted,
       status: IntegrationStatus.CONNECTED,
       lastTestedAt: new Date(),
-      client: { connect: { id: clientId } },
+      project: { connect: { id: projectId } },
     });
 
-    logger.success('system', 'connectShopify', `Shopify connected for client ${clientId}`);
+    logger.success('system', 'connectShopify', `Shopify connected for project ${projectId}`);
     return this.safeIntegration(integration);
   }
 
@@ -67,8 +67,8 @@ export class IntegrationService {
     return this.safeIntegration(updated);
   }
 
-  async listByClient(clientId: string) {
-    const list = await integrationRepo.findByClient(clientId);
+  async listByProject(projectId: string) {
+    const list = await integrationRepo.findByProject(projectId);
     return list.map((i) => this.safeIntegration(i));
   }
 

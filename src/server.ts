@@ -12,7 +12,9 @@ import authRoutes from './routes/authRoutes';
 import adminRoutes from './routes/adminRoutes';
 import agencyRoutes from './routes/agencyRoutes';
 import userRoutes from './routes/userRoutes';
+import workspaceRoutes from './routes/workspaceRoutes';
 import clientRoutes from './routes/clientRoutes';
+import projectRoutes from './routes/projectRoutes';
 import reviewRoutes from './routes/reviewRoutes';
 import portalRoutes from './routes/portalRoutes';
 
@@ -63,7 +65,9 @@ app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/agency', agencyRoutes);
 app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/workspaces', workspaceRoutes);
 app.use('/api/v1/clients', clientRoutes);
+app.use('/api/v1/projects', projectRoutes);
 app.use('/api/v1/reviews', reviewRoutes);
 app.use('/api/v1/portal', portalRoutes);
 
